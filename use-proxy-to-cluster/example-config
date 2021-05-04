@@ -1,0 +1,18 @@
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: <data>
+    server: https://<address>:<port>
+  name: <name>
+contexts:
+- context:
+    cluster: <name>
+    user: <username>
+  name: <name>
+current-context: <context name>
+kind: Config
+preferences: {}
+users:
+- name: <username>
+  user:
+    token: <data>
