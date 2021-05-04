@@ -16,10 +16,6 @@ func main() {
 	kubeConfigPath := flag.String("kubeconfig", "", "Location of the kubeconfig file")
 	flag.Parse()
 
-	if httpsProxy != nil {
-		setProxy(*httpsProxy)
-	}
-
 	var (
 		kubeconfig []byte
 		err        error
@@ -28,7 +24,7 @@ func main() {
 		kubeconfig, err = ioutil.ReadFile(*kubeConfigPath)
 	}
 
-	client, err := remoteClient(kubeconfig)
+	client, err := remoteClient(kubeconfig, *httpsProxy)
 	if err != nil {
 		fmt.Printf("connect to src cluster using kubeconfig at %s: %v\n", kubeConfigPath, err)
 		os.Exit(1)
