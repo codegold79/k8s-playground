@@ -4,27 +4,28 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path"
 
 	"github.com/sirupsen/logrus"
-	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/backup"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 )
 
-func (cxn clusterConnection) backup(ctx context.Context, log *logrus.Logger) error {
-	builtBackup := builder.
-		ForBackup(velero.DefaultNamespace, "playground").
-		IncludedNamespaces("nginx-example").
+func (cxn clusterConnection) backup(ctx context.Context, log *logrus.Logger, config backupConfig) error {
+	// TODO: include flags to be able to include different resources,
+	// namespaces, etc.
+	backupResource := builder.
+		ForBackup(config.namespace, config.name).
+		IncludedNamespaces(config.includedNamespaces).
 		DefaultVolumesToRestic(false).
 		Result()
 
 	request := backup.Request{
-		Backup: builtBackup,
+		Backup: backupResource,
 	}
 
-	// TODO: Make names, namespaces, backup file to restore configurable.
-	os.MkdirAll("/tmp/velero-playground", 0644)
-	backupFile, err := os.Create("/tmp/velero-playground/backup-nginx.tar.gz")
+	os.MkdirAll(path.Dir(config.filepath), 0644)
+	backupFile, err := os.Create(config.filepath)
 	if err != nil {
 		return fmt.Errorf("create backup file: %w", err)
 	}

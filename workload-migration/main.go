@@ -1,109 +1,111 @@
 /*
-	Use Velero as a library to back up and restore to Kubernetes clusters.
+Use Velero as a library to back up and restore Kubernetes clusters.
 */
 package main
 
 import (
 	"context"
-	"fmt"
+	"errors"
+	"flag"
+	"path"
+	"time"
 
 	"github.com/sirupsen/logrus"
-	"github.com/vmware-tanzu/velero/pkg/client"
-	"github.com/vmware-tanzu/velero/pkg/discovery"
-	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
-	"github.com/vmware-tanzu/velero/pkg/podexec"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 )
 
+// TODO: Have these passed in as flags
+const (
+	includedNamespaces         = "nginx-example"
+	namespace                  = "playground"
+	backupName                 = "backup"
+	restoreName                = "restore"
+	resourceTerminatingTimeout = time.Minute * 10
+)
+
+type backupConfig struct {
+	name               string
+	namespace          string
+	includedNamespaces string
+	filepath           string
+}
+
+type restoreConfig struct {
+	name                       string
+	namespace                  string
+	includedNamespaces         string
+	filepath                   string
+	backupName                 string
+	resourceTerminatingTimeout time.Duration
+}
+
 func main() {
+	action := flag.String("a", "", "backup or restore")
+	filepath := flag.String("p", "", "The location and file name of the backup file or the file to restore. Example: /Users/codegold/Documents/kubebackups/backup.tar.gz.")
+	flag.Parse()
+
+	*filepath = path.Clean(*filepath)
+
 	// TODO: make a timeout context.
 	ctx := context.TODO()
 	log := logrus.New()
 
-	// TODO: Have a clusterCxn factory that can determine which clients to instantiate.
+	if err := validateCommandArgs(*action, *filepath); err != nil {
+		log.WithField("event", "validate commandline arguments").Error(err)
+	}
+
+	// TODO: Have a clusterCxn factory that can determine which client type to
+	// instantiate.
 	clusterCxn, err := connectionComponents(ctx, log)
 	if err != nil {
 		log.WithField("event", "collect cluster connection components").Error(err)
 	}
 
-	// TODO: Use user input to determine which function to run.
-	// TODO: Determine ahead of time which clusterCxn (remote, in-cluster, etc) to send
-	if err := clusterCxn.backup(ctx, log); err != nil {
-		log.WithFields(logrus.Fields{
-			"event":              "backup Kubernetes workload",
-			"cluster connection": clusterCxn.description,
-		})
-	}
+	switch *action {
+	case "backup":
+		config := backupConfig{
+			name:               backupName,
+			namespace:          namespace,
+			includedNamespaces: includedNamespaces,
+			filepath:           *filepath,
+		}
 
-	// TODO: Use user input to determine which function to run.
-	// TODO: Determine ahead of time which clusterCxn (remote, in-cluster, etc) to send
-	// if err := clusterCxn.restore(ctx, log); err != nil {
-	// 	log.WithFields(logrus.Fields{
-	// 		"event":              "restore Kubernetes workload",
-	// 		"cluster connection": clusterCxn.description,
-	// 	})
-	// }
+		// TODO: Generate the correct remote/in-cluster client with a connection
+		// factory
+		if err := clusterCxn.backup(ctx, log, config); err != nil {
+			log.WithFields(logrus.Fields{
+				"event":              "backup Kubernetes workload",
+				"cluster connection": clusterCxn.description,
+			})
+		}
+	case "restore":
+		config := restoreConfig{
+			name:                       restoreName,
+			namespace:                  namespace,
+			includedNamespaces:         "",
+			filepath:                   *filepath,
+			backupName:                 backupName,
+			resourceTerminatingTimeout: resourceTerminatingTimeout,
+		}
+
+		// TODO: Generate the correct remote/in-cluster client with a connection
+		// factory
+		if err := clusterCxn.restore(ctx, log, config); err != nil {
+			log.WithFields(logrus.Fields{
+				"event":              "restore Kubernetes workload",
+				"cluster connection": clusterCxn.description,
+			})
+		}
+	}
 }
 
-type clusterConnection struct {
-	description        string
-	veleroConfig       client.VeleroConfig
-	veleroClient       clientset.Interface
-	discoveryHelper    discovery.Helper
-	dynamicFactory     client.DynamicFactory
-	kubeClientConfig   *rest.Config
-	kubeClient         kubernetes.Interface
-	podCommandExecutor podexec.PodCommandExecutor
-}
-
-func connectionComponents(ctx context.Context, log *logrus.Logger) (clusterConnection, error) {
-	veleroConfig := client.VeleroConfig{}
-
-	factory := client.NewFactory("playground", veleroConfig)
-
-	veleroClient, err := factory.Client()
-	if err != nil {
-		return clusterConnection{}, fmt.Errorf("create velero client: %w", err)
+func validateCommandArgs(action, filepath string) error {
+	if action != "backup" && action != "restore" {
+		return errors.New("action must be either backup or restore")
 	}
 
-	discoveryClient := veleroClient.Discovery()
-
-	dynamicClient, err := factory.DynamicClient()
-	if err != nil {
-		return clusterConnection{}, fmt.Errorf("create dynamic client: %w", err)
+	if filepath == "" {
+		return errors.New("backup file location must not be empty")
 	}
 
-	discoveryHelper, err := discovery.NewHelper(discoveryClient, log)
-	if err != nil {
-		return clusterConnection{}, fmt.Errorf("create discovery helper: %w", err)
-	}
-
-	dynamicFactory := client.NewDynamicFactory(dynamicClient)
-
-	kubeClient, err := factory.KubeClient()
-	if err != nil {
-		return clusterConnection{}, fmt.Errorf("create kubeclient: %w", err)
-	}
-
-	kubeClientConfig, err := factory.ClientConfig()
-	if err != nil {
-		return clusterConnection{}, fmt.Errorf("create kubeclient config: %w", err)
-	}
-
-	podCommandExecutor := podexec.NewPodCommandExecutor(
-		kubeClientConfig,
-		kubeClient.CoreV1().RESTClient(),
-	)
-
-	return clusterConnection{
-		description:        "in-cluster Velero",
-		veleroConfig:       veleroConfig,
-		veleroClient:       veleroClient,
-		discoveryHelper:    discoveryHelper,
-		dynamicFactory:     dynamicFactory,
-		kubeClientConfig:   kubeClientConfig,
-		kubeClient:         kubeClient,
-		podCommandExecutor: podCommandExecutor,
-	}, nil
+	return nil
 }
