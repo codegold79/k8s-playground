@@ -1,5 +1,5 @@
 /*
-Use Velero as a library to back up and restore Kubernetes clusters.
+Use Velero API to back up and restore Kubernetes clusters remotely.
 */
 package main
 
@@ -15,8 +15,7 @@ import (
 
 // TODO: Have these passed in as flags
 const (
-	includedNamespaces         = "nginx-example"
-	namespace                  = "playground"
+	namespace                  = "migrator"
 	backupName                 = "backup"
 	restoreName                = "restore"
 	resourceTerminatingTimeout = time.Minute * 10
@@ -40,7 +39,10 @@ type restoreConfig struct {
 
 func main() {
 	action := flag.String("a", "", "backup or restore")
-	filepath := flag.String("p", "", "The location and file name of the backup file or the file to restore. Example: /Users/codegold/Documents/kubebackups/backup.tar.gz.")
+	filepath := flag.String("p", "", "The location and file name of the backup file or the file to restore. Example: /Users/codegold79/kubebackups/backup.tar.gz.")
+	secretName := flag.String("s", "", "Optional: The name of secret which contains remote cluster credentials")
+	secretNamespace := flag.String("n", "", "Required if secret is provided: the namespace where the remote credentials secret is")
+	includedNamespaces := flag.String("i", "", "Optional: included namespaces")
 	flag.Parse()
 
 	*filepath = path.Clean(*filepath)
@@ -49,15 +51,20 @@ func main() {
 	ctx := context.TODO()
 	log := logrus.New()
 
-	if err := validateCommandArgs(*action, *filepath); err != nil {
+	if err := validateCommandArgs(*action, *filepath, *secretName, *secretNamespace); err != nil {
 		log.WithField("event", "validate commandline arguments").Error(err)
 	}
 
-	// TODO: Have a clusterCxn factory that can determine which client type to
-	// instantiate.
-	clusterCxn, err := connectionComponents(ctx, log)
+	log.Info("obtain Kubernetes cluster credentials")
+	kubeAccess, err := newKubeAccess(ctx, log, *secretName, *secretNamespace)
 	if err != nil {
-		log.WithField("event", "collect cluster connection components").Error(err)
+		log.WithField("event", "retrieve kubernetes cluster access details").Error(err)
+	}
+
+	log.Info("retrieve cluster connection clients and configs")
+	clusterCxn, err := newClusterConnection(ctx, log, kubeAccess)
+	if err != nil {
+		log.WithField("event", "create cluster connection").Error(err)
 	}
 
 	switch *action {
@@ -65,16 +72,15 @@ func main() {
 		config := backupConfig{
 			name:               backupName,
 			namespace:          namespace,
-			includedNamespaces: includedNamespaces,
+			includedNamespaces: *includedNamespaces,
 			filepath:           *filepath,
 		}
 
-		// TODO: Generate the correct remote/in-cluster client with a connection
-		// factory
+		log.Info("start backup")
 		if err := clusterCxn.backup(ctx, log, config); err != nil {
 			log.WithFields(logrus.Fields{
 				"event":              "backup Kubernetes workload",
-				"cluster connection": clusterCxn.description,
+				"cluster connection": clusterCxn.host,
 			})
 		}
 	case "restore":
@@ -87,24 +93,27 @@ func main() {
 			resourceTerminatingTimeout: resourceTerminatingTimeout,
 		}
 
-		// TODO: Generate the correct remote/in-cluster client with a connection
-		// factory
+		log.Info("start restore")
 		if err := clusterCxn.restore(ctx, log, config); err != nil {
 			log.WithFields(logrus.Fields{
 				"event":              "restore Kubernetes workload",
-				"cluster connection": clusterCxn.description,
+				"cluster connection": clusterCxn.host,
 			})
 		}
 	}
 }
 
-func validateCommandArgs(action, filepath string) error {
+func validateCommandArgs(action, filepath, secret, secretNS string) error {
 	if action != "backup" && action != "restore" {
 		return errors.New("action must be either backup or restore")
 	}
 
 	if filepath == "" {
 		return errors.New("backup file location must not be empty")
+	}
+
+	if secret == "" && secretNS != "" || secret != "" && secretNS == "" {
+		return errors.New("provide both remote cluster credentials secret and its namespace or neither")
 	}
 
 	return nil

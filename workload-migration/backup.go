@@ -12,8 +12,6 @@ import (
 )
 
 func (cxn clusterConnection) backup(ctx context.Context, log *logrus.Logger, config backupConfig) error {
-	// TODO: include flags to be able to include different resources,
-	// namespaces, etc.
 	backupResource := builder.
 		ForBackup(config.namespace, config.name).
 		IncludedNamespaces(config.includedNamespaces).

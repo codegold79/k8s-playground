@@ -34,19 +34,20 @@ var defaultRestorePriorities = []string{
 }
 
 func (cxn clusterConnection) restore(ctx context.Context, log *logrus.Logger, config restoreConfig) error {
+	log.WithField("event", "restore")
+
 	backupResource := builder.
 		ForBackup(namespace, config.name).
 		IncludedNamespaces(config.includedNamespaces).
 		DefaultVolumesToRestic(false).
 		Result()
 
-	// TODO: Make names and namespaces configurable.
 	restoreResource := builder.
 		ForRestore(config.namespace, config.name).
 		Backup(config.backupName).
 		Result()
 
-	// TODO: Make backup file name and path configurable
+	log.WithField("file", config.filepath).Info("open backup file")
 	backupFile, err := os.Open(config.filepath)
 	if err != nil {
 		return fmt.Errorf("open backup file: %w", err)
