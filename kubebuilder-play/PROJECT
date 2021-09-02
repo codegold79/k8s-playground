@@ -1,0 +1,6 @@
+domain: codegold.io
+layout:
+- go.kubebuilder.io/v3
+projectName: kubebuilder-play
+repo: github.com/codegold79/k8s-playground/kubebuilder-play
+version: "3"
