@@ -3,4 +3,14 @@ layout:
 - go.kubebuilder.io/v3
 projectName: kubebuilder-play
 repo: github.com/codegold79/k8s-playground/kubebuilder-play
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: codegold.io
+  group: batch
+  kind: CronJob
+  path: github.com/codegold79/k8s-playground/kubebuilder-play/api/v1
+  version: v1
 version: "3"
