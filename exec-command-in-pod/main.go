@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 
@@ -15,9 +16,9 @@ import (
 )
 
 const (
-	ns        = "codegold79"
-	pod       = "k8s"
-	container = "playground"
+	ns        = "kuard-example"
+	pod       = "kuard-deployment-bd94b5dbb-7hl4f"
+	container = "kuard"
 
 	saTokenKey     = "CREDENTIAL_SA_TOKEN"
 	clusterHostKey = "CREDENTIAL_CLUSTER_HOST"
@@ -62,15 +63,18 @@ func main() {
 		return
 	}
 
+	var output bytes.Buffer
 	err = exec.Stream(remotecommand.StreamOptions{
 		Stdin:  os.Stdin,
-		Stdout: os.Stdout,
+		Stdout: &output,
 		Stderr: os.Stderr,
 		Tty:    false,
 	})
 	if err != nil {
 		fmt.Println("execute command in pod:", err)
 	}
+
+	fmt.Printf("the following was the output:\n%v", output.String())
 }
 
 type clusterCredentials struct {
