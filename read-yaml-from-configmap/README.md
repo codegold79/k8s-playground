@@ -46,6 +46,13 @@ kubectl create configmap vmsizes --from-file=vmsizes.yaml
     go run *.go -kubeconfig /path/to/kubeconfig
 ```
 
+- example command and output
+
+```bash
+$ go run *.go -kubeconfig kind.kube
+sizes: main.vmSizes{Tags:map[string]main.specs{"2xlarge":main.specs{VCPU:8, MemGiB:32}, "large":main.specs{VCPU:2, MemGiB:8}, "medium":main.specs{VCPU:2, MemGiB:4}, "small":main.specs{VCPU:2, MemGiB:2}, "xlarge":main.specs{VCPU:4, MemGiB:16}}, Category:"sizes"}
+```
+
 Credits
 
 - Client-go example (https://github.com/kubernetes/client-go/blob/master/examples/out-of-cluster-client-configuration/main.go)
