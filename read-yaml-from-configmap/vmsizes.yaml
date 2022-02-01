@@ -1,0 +1,17 @@
+tags:
+  small:
+    vCPU: 2
+    MemGiB: 2
+  medium:
+    vCPU: 2
+    MemGiB: 4
+  large:
+    vCPU: 2
+    MemGiB: 8
+  xlarge:
+    vCPU: 4
+    MemGiB: 16
+  2xlarge:
+    vCPU: 8
+    MemGiB: 32
+category: "sizes" # Optional
