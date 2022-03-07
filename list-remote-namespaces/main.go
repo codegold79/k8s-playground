@@ -12,7 +12,8 @@ import (
 func main() {
 
 	if len(os.Args) < 2 {
-		fmt.Println("Provide pass at least one cluster filename as an the argument to run this application.")
+		// Example credentials file is cluster-1.yaml in this directory.
+		fmt.Println("Provide one or more yaml files containing SA creds to k8s clusters as an the argument to run this application.")
 		os.Exit(1)
 	}
 
